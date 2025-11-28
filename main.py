@@ -14,6 +14,9 @@ from pydantic import BaseModel
 # Google GenAI SDK (Gemini)
 from google import genai
 
+# include anomaly router (make sure anomaly_router.py exists in project root)
+from anomaly_router import router as anomaly_router
+
 # -----------------------------------------------------------
 # Lazy Gemini client initialization
 # -----------------------------------------------------------
@@ -35,6 +38,9 @@ def get_genai_client():
 # FastAPI App
 # -----------------------------------------------------------
 app = FastAPI(title="Finance-Only Chat (Gemini + FastAPI)")
+
+# register anomaly router
+app.include_router(anomaly_router)
 
 # -----------------------------------------------------------
 # Finance Keyword Filter (fast)
