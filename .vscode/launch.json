@@ -1,0 +1,44 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Uvicorn (FastAPI) - Debug",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/env/bin/uvicorn",
+      "args": [
+        "main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8080",
+        "--reload"
+      ],
+      "console": "integratedTerminal",
+      "env": {
+        "GEMINI_API_KEY": "AIzaSyCNU4sg8KPFsUvvPAo7DQl7Zd2TPdLd0hI",
+        "PYTHONUNBUFFERED": "1"
+      },
+      "justMyCode": true
+    },
+    {
+      "name": "Run Uvicorn (FastAPI) - No Reload",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/env/bin/uvicorn",
+      "args": [
+        "main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8080"
+      ],
+      "console": "integratedTerminal",
+      "env": {
+        "GEMINI_API_KEY": "AIzaSyCNU4sg8KPFsUvvPAo7DQl7Zd2TPdLd0hI",
+        "PYTHONUNBUFFERED": "1"
+      },
+      "justMyCode": true
+    }
+  ]
+}

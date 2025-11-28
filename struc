@@ -1,0 +1,11 @@
+expencemonitor/
+├── env/                # your virtual environment (already created)
+├── data/
+│   └── sample.csv      # will hold your data (we can generate it)
+├── models/
+│   └── (empty for now)
+├── src/
+│   ├── train.py
+│   ├── predict_example.py
+│   └── preprocess.py
+└── requirements.txt
