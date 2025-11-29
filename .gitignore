@@ -3,3 +3,8 @@ __pycache__/
 *.save
 __pycache__/
 *.pyc
+# serverFinAI local env / caches
+serverFinAI/env/
+serverFinAI/.env
+serverFinAI/__pycache__/
+serverFinAI/*.pyc
