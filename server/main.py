@@ -60,10 +60,10 @@ async def generate_finance_advice(request: GenerateRequest):
         GenerateResponse with success status, AI response, or error message
     """
     try:
-        # FIX 1: Use correct model name
-        # Changed from 'models/gemini-1.5-flash' to 'gemini-1.5-flash-latest'
-        # Alternative stable option: 'gemini-pro'
-        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        # FIX 1: Use correct model name for v1beta API
+        # Use 'gemini-pro' for v1beta (most stable and widely available)
+        # For v1 API, you can use: 'models/gemini-1.5-flash' or 'models/gemini-1.5-pro'
+        model = genai.GenerativeModel('gemini-pro')
         
         # Build enhanced prompt with financial context
         full_prompt = _build_prompt_with_context(request.prompt, request.context)
