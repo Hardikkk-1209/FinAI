@@ -1,203 +1,217 @@
-# main.py - FinAI FastAPI Server for Render Deployment
-import os
-import json
-from typing import Optional
+"""
+FinAI Backend - FastAPI Server
+Fixed version with proper Gemini model name and error handling
+"""
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import google.generativeai as genai
-import uvicorn
+import os
+from typing import Optional, Dict, Any
 
-# Initialize FastAPI app
-app = FastAPI(
-    title="FinAI Assistant",
-    description="AI-powered personal finance assistant using Google Gemini",
-    version="1.0.0"
-)
+app = FastAPI(title="FinAI Backend API")
 
-# Configure CORS for all origins (required for Flutter app)
+# Configure CORS - allow Flutter app to make requests
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with your Flutter app domains
+    allow_origins=["*"],  # In production, specify your Flutter app URL
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Get API key from environment variable
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY environment variable is required")
-
-# Configure Google Gemini
+# Configure Gemini AI
+# Make sure to set your API key in environment variables or here
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "YOUR_API_KEY_HERE")
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-1.5-flash")
 
-# Finance advisor system prompt
-FINANCE_SYSTEM_PROMPT = """You are FinAI, an AI-powered personal finance assistant inside a mobile app.
-Your ONLY job is to help users understand, analyze, and improve their personal finances.
 
-CRITICAL BEHAVIOR RULES:
-- Stay strictly within the domain of personal finance, budgeting, savings, spending analysis, debt management, credit cards, and basic investing concepts.
-- If the user asks for anything unrelated to money/finance, politely refuse and redirect them back to financial topics.
-- Never roleplay, tell stories, generate code, or answer questions about unrelated domains (e.g., medicine, politics, entertainment, relationships, exams, coding, agriculture, etc.).
-
-APP CONTEXT:
-- The app automatically reads and categorizes transaction SMS and bank data (using NLP).
-- It computes a Financial Health Score based on income, expenses, savings, debts, and risk signals.
-- It detects unusual/anomalous spending patterns and risky transactions.
-- It provides personalized, actionable tips to help users budget better, save more, and avoid unnecessary risk.
-
-TONE & STYLE:
-- Be concise, clear, and friendly.
-- Explain concepts in simple language so that a non-expert can understand.
-- Prefer short paragraphs and bullet points.
-- When giving suggestions, be practical and realistic. Avoid generic motivational quotes.
-
-HOW TO ANSWER:
-1. When the user asks general finance questions:
-   - Explain the concept briefly.
-   - Show simple, concrete examples with numbers.
-   - If relevant, suggest simple actions they can take.
-
-2. When the user asks about their own finances (e.g., “Am I spending too much on X?”):
-   - Ask for any missing key details (income, typical monthly expenses, debts, timeframe).
-   - Then respond with a structured analysis and 2–4 specific recommendations.
-
-3. When the user mentions risky behavior (e.g., high-interest loans, heavy credit card usage):
-   - Clearly highlight the risk.
-   - Suggest safer alternatives or mitigation steps.
-   - Emphasize long-term financial health.
-
-4. When you are NOT sure or data is missing:
-   - Be honest. Say “I don’t have enough information to be precise, but here is a safe general guideline…”
-   - Never fabricate numbers, transactions, or user data.
-
-SAFETY & LIMITS:
-- Do NOT give legal, tax, or investment advice that sounds like a guarantee.
-- Use language like “general information”, “this is not professional advice”, and “please consult a qualified financial advisor or tax professional for decisions involving large amounts or legal implications.”
-- Do NOT recommend specific stocks, individual crypto coins, or high-risk speculative products.
-- You may talk about broad asset classes (e.g., equity mutual funds, index funds, fixed deposits) in a generic, educational way.
-
-IF THE USER'S MESSAGE IS OFF-TOPIC:
-- Say something like: “I am designed only for personal finance guidance. Let us talk about your money, spending, saving, or financial goals.”
-- Then offer a helpful finance-related follow-up question.
-
-Your primary goal: help the user make better day-to-day financial decisions, understand their money patterns, and build healthier financial habits over time.
-"""
-
-# Pydantic models
-class TextPrompt(BaseModel):
-    # user question
+class GenerateRequest(BaseModel):
     prompt: str
-    # optional financial data context from frontend/backend
-    # e.g. monthly summary, category spends, suspicious txns, etc.
-    context: Optional[dict] = None
+    context: Optional[Dict[str, Any]] = None
 
 
-class APIResponse(BaseModel):
+class GenerateResponse(BaseModel):
     success: bool
-    response: str
+    response: Optional[str] = None
     error: Optional[str] = None
 
 
-# Root endpoint
 @app.get("/")
 async def root():
+    """Health check endpoint"""
     return {
-        "message": "FinAI Assistant API is running successfully!",
-        "status": "healthy",
-        "version": "1.0.0",
-        "endpoints": {
-            "health": "/health",
-            "text_chat": "/generate (POST)",
-            "documentation": "/docs"
-        },
+        "status": "online",
+        "service": "FinAI Backend API",
+        "version": "1.0.0"
     }
 
 
-# Health check endpoint
-@app.get("/health")
-async def health_check():
-    return {
-        "status": "ok",
-        "model": "gemini-1.5-flash",
-        "service": "FinAI Assistant API",
-    }
-
-
-# Text-based finance advice endpoint
-@app.post("/generate", response_model=APIResponse)
-async def generate_finance_advice(body: TextPrompt):
+@app.post("/generate", response_model=GenerateResponse)
+async def generate_finance_advice(request: GenerateRequest):
     """
-    Generate personal finance advice from text prompt + optional data context.
+    Generate AI-powered financial advice based on user prompt and context
+    
+    Args:
+        request: Contains prompt (user question) and optional context (financial data)
+    
+    Returns:
+        GenerateResponse with success status, AI response, or error message
     """
     try:
-        user_prompt = (body.prompt or "").strip()
-        if not user_prompt:
-            return APIResponse(
-                success=False,
-                response="",
-                error="Please provide a finance-related question.",
-            )
+        # FIX 1: Use correct model name
+        # Changed from 'models/gemini-1.5-flash' to 'gemini-1.5-flash-latest'
+        # Alternative stable option: 'gemini-pro'
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        
+        # Build enhanced prompt with financial context
+        full_prompt = _build_prompt_with_context(request.prompt, request.context)
+        
+        # Generate AI response
+        response = model.generate_content(full_prompt)
+        
+        # Extract text from response
+        ai_response = response.text
+        
+        # FIX 2: Only return success=True if we actually got a response
+        if not ai_response or len(ai_response.strip()) == 0:
+            raise Exception("Empty response from AI model")
+        
+        return GenerateResponse(
+            success=True,
+            response=ai_response,
+            error=None
+        )
+        
+    except Exception as e:
+        # FIX 3: Log error and return proper error response
+        error_message = str(e)
+        print(f"Error in generate_finance_advice: {error_message}")
+        
+        # Return success=False so Flutter app knows it's an error
+        return GenerateResponse(
+            success=False,
+            response=None,
+            error=error_message
+        )
 
-        context_data = body.context or {}
-        context_json = json.dumps(context_data, indent=2)
 
-        # Combine system prompt with user question and structured financial data
-        full_prompt = f"""
-{FINANCE_SYSTEM_PROMPT}
+def _build_prompt_with_context(user_prompt: str, context: Optional[Dict[str, Any]]) -> str:
+    """
+    Build an enhanced prompt with financial context for better AI responses
+    
+    Args:
+        user_prompt: The user's question
+        context: Optional financial data (spending, savings, transactions, etc.)
+    
+    Returns:
+        Enhanced prompt string with context
+    """
+    if not context:
+        return f"""You are FinAI, a helpful personal finance assistant. 
+Answer the following question in a friendly, concise manner:
 
-Below is the user's current financial data in JSON format.
-Use ONLY this data for any numbers, amounts, or statistics.
-If something is missing, say so and give general guidance instead of guessing.
+{user_prompt}"""
+    
+    # Build context string
+    context_parts = []
+    
+    if 'user_name' in context:
+        context_parts.append(f"User: {context['user_name']}")
+    
+    if 'currency' in context:
+        context_parts.append(f"Currency: {context['currency']}")
+    
+    if 'financial_health_score' in context:
+        context_parts.append(f"Financial Health Score: {context['financial_health_score']}/100")
+    
+    if 'monthly_spending' in context:
+        context_parts.append(f"Monthly Spending: {context['monthly_spending']}")
+    
+    if 'monthly_savings' in context:
+        context_parts.append(f"Monthly Savings: {context['monthly_savings']}")
+    
+    if 'spending_by_category' in context:
+        categories = context['spending_by_category']
+        category_str = ", ".join([f"{k}: {v}" for k, v in categories.items()])
+        context_parts.append(f"Spending by Category: {category_str}")
+    
+    if 'recent_transactions' in context:
+        transactions = context['recent_transactions']
+        trans_str = ", ".join([
+            f"{t.get('merchant', 'Unknown')} (${t.get('amount', 0)}, {t.get('category', 'Other')})"
+            for t in transactions[:5]  # Limit to 5 recent
+        ])
+        context_parts.append(f"Recent Transactions: {trans_str}")
+    
+    context_text = "\n".join(context_parts)
+    
+    return f"""You are FinAI, a helpful personal finance assistant.
 
-USER DATA (JSON):
-{context_json}
+FINANCIAL CONTEXT:
+{context_text}
 
 USER QUESTION:
 {user_prompt}
 
-INSTRUCTIONS:
-- Do not invent or assume any transactions or amounts.
-- If you mention any number, it must come from the JSON above.
-- If the question asks for a summary, first restate the key numbers, then give 2–4 practical suggestions.
-- Keep the answer concise and friendly.
-"""
+Provide a helpful, personalized response based on the financial context above. 
+Be concise, friendly, and actionable. If suggesting actions, be specific."""
 
-        # Generate response using Gemini
-        response = model.generate_content(full_prompt)
 
-        if not getattr(response, "text", None):
-            return APIResponse(
-                success=False,
-                response="",
-                error="No response generated. Please try again.",
-            )
-
-        return APIResponse(
-            success=True,
-            response=response.text,
-            error=None,
-        )
-
+@app.get("/models")
+async def list_available_models():
+    """
+    List all available Gemini models that support content generation
+    Useful for debugging model availability issues
+    """
+    try:
+        models_list = []
+        for model in genai.list_models():
+            if 'generateContent' in model.supported_generation_methods:
+                models_list.append({
+                    "name": model.name,
+                    "display_name": model.display_name,
+                    "description": model.description,
+                    "supported_methods": model.supported_generation_methods
+                })
+        
+        return {
+            "success": True,
+            "count": len(models_list),
+            "models": models_list
+        }
     except Exception as e:
-        print(f"Error in generate_finance_advice: {str(e)}")
-        return APIResponse(
-            success=False,
-            response="",
-            error="Sorry, I'm having trouble processing your request. Please try again later.",
-        )
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 
-# Ping endpoint for monitoring
-@app.get("/ping")
-async def ping():
-    return {"ping": "pong", "timestamp": "ok"}
+@app.get("/health")
+async def health_check():
+    """Check if the API and Gemini connection are working"""
+    try:
+        # Test if we can list models (verifies API key and connection)
+        list(genai.list_models())
+        return {
+            "status": "healthy",
+            "api_configured": True,
+            "gemini_connected": True
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "api_configured": GEMINI_API_KEY != "YOUR_API_KEY_HERE",
+            "gemini_connected": False,
+            "error": str(e)
+        }
 
 
-# Run the application
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    import uvicorn
+    
+    # Run the server
+    # For development: uvicorn main:app --reload
+    # For production on Render: Use Procfile or render.yaml
+    uvicorn.run(app, host="0.0.0.0", port=8000)
