@@ -1,3 +1,5 @@
 __pycache__/
 *.pyc
 *.save
+__pycache__/
+*.pyc
